@@ -37,6 +37,7 @@ final class Plugin {
 		add_action( 'add_meta_boxes_' . self::POST_TYPE, array( $this, 'register_meta_boxes' ) );
 		add_action( 'save_post_' . self::POST_TYPE, array( $this, 'save_slider' ), 10, 2 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+		add_action( 'wp_ajax_mfs_search_content', array( $this, 'search_content' ) );
 		add_filter( 'manage_' . self::POST_TYPE . '_posts_columns', array( $this, 'add_admin_columns' ) );
 		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( $this, 'render_admin_column' ), 10, 2 );
 		add_filter( 'enter_title_here', array( $this, 'filter_title_placeholder' ), 10, 2 );
@@ -159,6 +160,19 @@ final class Plugin {
 				'videoTitle'    => __( 'Choose video', 'mlyn-flexible-slider' ),
 				'posterTitle'   => __( 'Choose poster image', 'mlyn-flexible-slider' ),
 				'useMedia'      => __( 'Use this media', 'mlyn-flexible-slider' ),
+				'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+				'contentNonce'  => wp_create_nonce( 'mfs_search_content' ),
+				'chooseContent' => __( 'Choose linked content', 'mlyn-flexible-slider' ),
+				'changeContent' => __( 'Change linked content', 'mlyn-flexible-slider' ),
+				'clearContent'  => __( 'Clear linked content', 'mlyn-flexible-slider' ),
+				'editContent'   => __( 'Edit content', 'mlyn-flexible-slider' ),
+				'selectContent' => __( 'Select', 'mlyn-flexible-slider' ),
+				'searchPrompt'  => __( 'Enter at least two characters, or enter an exact numeric ID.', 'mlyn-flexible-slider' ),
+				'searching'     => __( 'Searching…', 'mlyn-flexible-slider' ),
+				'noResults'     => __( 'No matching published content found.', 'mlyn-flexible-slider' ),
+				'searchError'   => __( 'Content search failed. Please try again.', 'mlyn-flexible-slider' ),
+				'loadMore'      => __( 'Load more', 'mlyn-flexible-slider' ),
+				'untitledSlide' => __( 'Untitled slide', 'mlyn-flexible-slider' ),
 			)
 		);
 	}
@@ -199,23 +213,23 @@ final class Plugin {
 	}
 
 	public function render_slides_meta_box( WP_Post $post ): void {
-		$slides  = $this->get_slides( $post->ID );
-		$content = $this->get_content_options();
+		$slides = $this->get_slides( $post->ID );
 		?>
 		<p><?php esc_html_e( 'Drag slides by the handle to set their order. Linked content can inherit its title, date, image, and URL; any populated slide field overrides the inherited value.', 'mlyn-flexible-slider' ); ?></p>
 		<div id="mfs-slides" class="mfs-slides">
 			<?php foreach ( $slides as $index => $slide ) : ?>
-				<?php $this->render_slide_editor( (string) $index, $slide, $content ); ?>
+				<?php $this->render_slide_editor( (string) $index, $slide ); ?>
 			<?php endforeach; ?>
 		</div>
 		<button type="button" class="button button-primary" id="mfs-add-slide"><?php esc_html_e( 'Add slide', 'mlyn-flexible-slider' ); ?></button>
 		<script type="text/html" id="mfs-slide-template">
-			<?php $this->render_slide_editor( '__INDEX__', $this->slide_defaults(), $content ); ?>
+			<?php $this->render_slide_editor( '__INDEX__', $this->slide_defaults() ); ?>
 		</script>
+		<?php $this->render_content_picker_modal(); ?>
 		<?php
 	}
 
-	private function render_slide_editor( string $index, array $slide, array $content ): void {
+	private function render_slide_editor( string $index, array $slide ): void {
 		$slide = wp_parse_args( $slide, $this->slide_defaults() );
 		?>
 		<article class="mfs-slide-editor" draggable="true" data-slide-index="<?php echo esc_attr( $index ); ?>">
@@ -235,19 +249,7 @@ final class Plugin {
 						<option value="post" <?php selected( $slide['type'], 'post' ); ?>><?php esc_html_e( 'Linked WordPress content', 'mlyn-flexible-slider' ); ?></option>
 					</select>
 				</label>
-				<label class="mfs-post-field" data-types="post">
-					<span><?php esc_html_e( 'Linked content', 'mlyn-flexible-slider' ); ?></span>
-					<select name="mfs_slides[<?php echo esc_attr( $index ); ?>][post_id]">
-						<option value="0"><?php esc_html_e( '— Select content —', 'mlyn-flexible-slider' ); ?></option>
-						<?php foreach ( $content as $group_label => $posts ) : ?>
-							<optgroup label="<?php echo esc_attr( $group_label ); ?>">
-								<?php foreach ( $posts as $content_post ) : ?>
-									<option value="<?php echo esc_attr( (string) $content_post->ID ); ?>" <?php selected( (int) $slide['post_id'], $content_post->ID ); ?>><?php echo esc_html( $content_post->post_title ); ?></option>
-								<?php endforeach; ?>
-							</optgroup>
-						<?php endforeach; ?>
-					</select>
-				</label>
+				<?php $this->render_content_picker( $index, (int) $slide['post_id'] ); ?>
 				<?php $this->render_media_field( $index, 'image_id', __( 'Image / image override', 'mlyn-flexible-slider' ), 'image', (int) $slide['image_id'] ); ?>
 				<?php $this->render_media_field( $index, 'video_id', __( 'Video', 'mlyn-flexible-slider' ), 'video', (int) $slide['video_id'], 'video' ); ?>
 				<?php $this->render_media_field( $index, 'poster_id', __( 'Video poster', 'mlyn-flexible-slider' ), 'poster', (int) $slide['poster_id'], 'video' ); ?>
@@ -265,6 +267,121 @@ final class Plugin {
 			</div>
 		</article>
 		<?php
+	}
+
+	private function render_content_picker( string $index, int $post_id ): void {
+		$post = $post_id ? get_post( $post_id ) : null;
+		$item = $post ? $this->format_content_item( $post ) : null;
+		if ( $post_id && ! $item ) {
+			$item = array(
+				'id'           => $post_id,
+				'title'        => __( 'Missing content', 'mlyn-flexible-slider' ),
+				'type_label'   => __( 'Unknown type', 'mlyn-flexible-slider' ),
+				'status_label' => __( 'Missing', 'mlyn-flexible-slider' ),
+				'date'         => '',
+				'edit_url'     => '',
+				'warning'      => __( 'The saved content no longer exists. Clear it or choose a replacement; its ID will be preserved until then.', 'mlyn-flexible-slider' ),
+			);
+		}
+		?>
+		<div class="mfs-post-field mfs-content-picker" data-types="post">
+			<span><?php esc_html_e( 'Linked content', 'mlyn-flexible-slider' ); ?></span>
+			<input class="mfs-post-id" type="hidden" name="mfs_slides[<?php echo esc_attr( $index ); ?>][post_id]" value="<?php echo esc_attr( (string) $post_id ); ?>">
+			<div class="mfs-content-selection"<?php echo $item ? '' : ' hidden'; ?>>
+				<strong class="mfs-content-title"><?php echo $item ? esc_html( $item['title'] ) : ''; ?></strong>
+				<div class="mfs-content-meta">
+					<span class="mfs-content-type"><?php echo $item ? esc_html( $item['type_label'] ) : ''; ?></span>
+					<span class="mfs-content-status"><?php echo $item ? esc_html( $item['status_label'] ) : ''; ?></span>
+					<span class="mfs-content-date"><?php echo $item ? esc_html( $item['date'] ) : ''; ?></span>
+					<?php if ( $item && $item['edit_url'] ) : ?>
+						<a class="mfs-content-id" href="<?php echo esc_url( $item['edit_url'] ); ?>" target="_blank" rel="noopener noreferrer" title="<?php esc_attr_e( 'Open the WordPress edit screen in a new tab', 'mlyn-flexible-slider' ); ?>">#<?php echo esc_html( (string) $item['id'] ); ?></a>
+					<?php else : ?>
+						<span class="mfs-content-id"><?php echo $item ? '#' . esc_html( (string) $item['id'] ) : ''; ?></span>
+					<?php endif; ?>
+				</div>
+				<p class="mfs-content-warning"<?php echo $item && $item['warning'] ? '' : ' hidden'; ?>><?php echo $item ? esc_html( $item['warning'] ) : ''; ?></p>
+			</div>
+			<div class="mfs-content-actions">
+				<button type="button" class="button mfs-choose-content"><?php echo esc_html( $item ? __( 'Change linked content', 'mlyn-flexible-slider' ) : __( 'Choose linked content', 'mlyn-flexible-slider' ) ); ?></button>
+				<button type="button" class="button-link-delete mfs-clear-content" <?php disabled( ! $item ); ?>><?php esc_html_e( 'Clear linked content', 'mlyn-flexible-slider' ); ?></button>
+			</div>
+		</div>
+		<?php
+	}
+
+	private function render_content_picker_modal(): void {
+		?>
+		<div id="mfs-content-modal" class="mfs-content-modal" hidden role="dialog" aria-modal="true" aria-labelledby="mfs-content-modal-title">
+			<div class="mfs-content-modal-backdrop"></div>
+			<div class="mfs-content-modal-dialog" role="document">
+				<header>
+					<h2 id="mfs-content-modal-title"><?php esc_html_e( 'Choose linked content', 'mlyn-flexible-slider' ); ?></h2>
+					<button type="button" class="button-link mfs-close-content-modal" aria-label="<?php esc_attr_e( 'Close content picker', 'mlyn-flexible-slider' ); ?>"><span class="dashicons dashicons-no-alt" aria-hidden="true"></span></button>
+				</header>
+				<div class="mfs-content-search-controls">
+					<label><span><?php esc_html_e( 'Search', 'mlyn-flexible-slider' ); ?></span><input id="mfs-content-search" type="search" autocomplete="off" placeholder="<?php esc_attr_e( 'Title, text, or exact ID', 'mlyn-flexible-slider' ); ?>"></label>
+					<label><span><?php esc_html_e( 'Content type', 'mlyn-flexible-slider' ); ?></span><select id="mfs-content-type"><option value=""><?php esc_html_e( 'All supported types', 'mlyn-flexible-slider' ); ?></option><?php foreach ( $this->get_searchable_post_types() as $post_type ) : ?><option value="<?php echo esc_attr( $post_type->name ); ?>"><?php echo esc_html( $post_type->labels->name ); ?></option><?php endforeach; ?></select></label>
+				</div>
+				<p id="mfs-content-search-status" class="mfs-content-search-status" aria-live="polite"><?php esc_html_e( 'Enter at least two characters, or enter an exact numeric ID.', 'mlyn-flexible-slider' ); ?></p>
+				<div id="mfs-content-results" class="mfs-content-results"></div>
+				<button type="button" id="mfs-content-load-more" class="button" hidden><?php esc_html_e( 'Load more', 'mlyn-flexible-slider' ); ?></button>
+			</div>
+		</div>
+		<?php
+	}
+
+	public function search_content(): void {
+		check_ajax_referer( 'mfs_search_content', 'nonce' );
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( array( 'message' => __( 'You are not allowed to search content.', 'mlyn-flexible-slider' ) ), 403 );
+		}
+
+		$term  = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+		$type  = isset( $_GET['post_type'] ) ? sanitize_key( wp_unslash( $_GET['post_type'] ) ) : '';
+		$page  = max( 1, absint( $_GET['page_number'] ?? 1 ) );
+		$types = $this->get_searchable_post_types();
+		if ( $type && ! isset( $types[ $type ] ) ) {
+			wp_send_json_error( array( 'message' => __( 'Unsupported content type.', 'mlyn-flexible-slider' ) ), 400 );
+		}
+		if ( ! ctype_digit( $term ) && strlen( $term ) < 2 ) {
+			wp_send_json_success( array( 'items' => array(), 'has_more' => false ) );
+		}
+
+		$allowed_types = $type ? array( $type ) : array_keys( $types );
+		wp_send_json_success( $this->find_content( $term, $allowed_types, $page ) );
+	}
+
+	private function find_content( string $term, array $allowed_types, int $page ): array {
+		if ( ctype_digit( $term ) ) {
+			$post = get_post( absint( $term ) );
+			$item = $post && 'publish' === $post->post_status && in_array( $post->post_type, $allowed_types, true ) && current_user_can( 'edit_post', $post->ID )
+				? $this->format_content_item( $post )
+				: null;
+			return array( 'items' => $item ? array( $item ) : array(), 'has_more' => false );
+		}
+
+		$query = new \WP_Query(
+			array(
+				'post_type'                    => $allowed_types,
+				'post_status'                  => 'publish',
+				'posts_per_page'               => 20,
+				'paged'                        => $page,
+				's'                            => $term,
+				'orderby'                      => 'relevance',
+				'order'                        => 'DESC',
+				'tribe_suppress_query_filters' => true,
+			)
+		);
+		$items = array();
+		foreach ( $query->posts as $post ) {
+			if ( current_user_can( 'edit_post', $post->ID ) ) {
+				$items[] = $this->format_content_item( $post );
+			}
+		}
+		return array(
+			'items'    => $items,
+			'has_more' => $page < (int) $query->max_num_pages,
+		);
 	}
 
 	private function render_media_field( string $index, string $key, string $label, string $kind, int $attachment_id, string $types = 'image,post' ): void {
@@ -303,7 +420,7 @@ final class Plugin {
 			<dd><?php esc_html_e( 'Choose a custom image, a custom video, or linked WordPress content.', 'mlyn-flexible-slider' ); ?></dd>
 
 			<dt><?php esc_html_e( 'Linked content', 'mlyn-flexible-slider' ); ?></dt>
-			<dd><?php esc_html_e( 'Select the event, post, or page whose content should be inherited. This appears only for the linked-content slide type.', 'mlyn-flexible-slider' ); ?></dd>
+			<dd><?php esc_html_e( 'Search published events, posts, and pages by title, text, or exact numeric ID. The picker shows the content type, status, date, and an ID link to its WordPress edit screen.', 'mlyn-flexible-slider' ); ?></dd>
 
 			<dt><?php esc_html_e( 'Image / image override', 'mlyn-flexible-slider' ); ?></dt>
 			<dd><?php esc_html_e( 'Required for a custom-image slide. For linked content, it replaces the featured image on this slide. Leave it empty to use the linked featured image.', 'mlyn-flexible-slider' ); ?></dd>
@@ -650,25 +767,54 @@ final class Plugin {
 		);
 	}
 
-	private function get_content_options(): array {
-		$options    = array();
-		$post_types = get_post_types( array( 'public' => true ), 'objects' );
-		unset( $post_types['attachment'] );
-		foreach ( $post_types as $post_type ) {
-			$posts = get_posts(
-				array(
-					'post_type'      => $post_type->name,
-					'post_status'    => 'publish',
-					'posts_per_page' => 100,
-					'orderby'        => 'title',
-					'order'          => 'ASC',
-				)
-			);
-			if ( $posts ) {
-				$options[ $post_type->labels->singular_name ] = $posts;
+	private function get_searchable_post_types(): array {
+		$post_types = get_post_types( array( 'public' => true, 'show_ui' => true ), 'objects' );
+		unset( $post_types['attachment'], $post_types[ self::POST_TYPE ] );
+		foreach ( $post_types as $name => $post_type ) {
+			if ( ! current_user_can( $post_type->cap->edit_posts ) ) {
+				unset( $post_types[ $name ] );
 			}
 		}
-		return $options;
+		return $post_types;
+	}
+
+	private function format_content_item( WP_Post $post ): array {
+		$post_type   = get_post_type_object( $post->post_type );
+		$status      = get_post_status_object( $post->post_status );
+		$title       = trim( wp_strip_all_tags( html_entity_decode( get_the_title( $post ), ENT_QUOTES, 'UTF-8' ) ) );
+		$date        = get_the_date( get_option( 'date_format' ), $post );
+		$edit_url    = current_user_can( 'edit_post', $post->ID ) ? get_edit_post_link( $post->ID, 'raw' ) : '';
+		$status_name = $status && isset( $status->label ) ? $status->label : $post->post_status;
+		$warning     = '';
+
+		if ( 'tribe_events' === $post->post_type ) {
+			$start = (string) get_post_meta( $post->ID, '_EventStartDate', true );
+			if ( $start ) {
+				$date = wp_date(
+					get_option( 'date_format' ) . ' ' . get_option( 'time_format' ),
+					$this->local_datetime_timestamp( $start ),
+					wp_timezone()
+				);
+			}
+		}
+		if ( 'publish' !== $post->post_status ) {
+			$warning = sprintf(
+				__( 'This content is %s and the linked slide will not be displayed until it is published.', 'mlyn-flexible-slider' ),
+				$status_name
+			);
+		}
+
+		return array(
+			'id'           => $post->ID,
+			'title'        => $title ?: __( '(no title)', 'mlyn-flexible-slider' ),
+			'post_type'    => $post->post_type,
+			'type_label'   => $post_type ? $post_type->labels->singular_name : $post->post_type,
+			'status'       => $post->post_status,
+			'status_label' => $status_name,
+			'date'         => $date,
+			'edit_url'     => $edit_url ?: '',
+			'warning'      => $warning,
+		);
 	}
 
 	public function add_admin_columns( array $columns ): array {

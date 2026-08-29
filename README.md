@@ -16,6 +16,10 @@ Template usage:
 echo mlyn_render_slider( 'homepage-hero' );
 ```
 
+The **Mlýn slider** block provides the native block-editor equivalent. Choose
+a published slider in the block sidebar; rendering continues to use the same
+server-side slider implementation as the shortcode and template function.
+
 Optional shortcode overrides are `variant="hero|default"`, `autoplay="true|false"`, and `class="custom-class"`.
 
 Slides can use a custom image, a Media Library video, or linked WordPress content. A linked event inherits its title, first tag, start date, URL, and featured image unless the corresponding slide fields override them.
@@ -23,6 +27,15 @@ Slides can use a custom image, a Media Library video, or linked WordPress conten
 The linked-content picker searches all published public content that the current administrator may edit, including past calendar events. Search by title/text or exact numeric ID, optionally filter by content type, and use the displayed ID link to verify the item on its WordPress edit screen. Existing links are preserved and identified even if their content later becomes unpublished or is deleted.
 
 ## Changelog
+
+### 1.3.1
+
+- Loaded the slider's structural styles in Gutenberg so its server-rendered preview matches the public hero instead of stacking every slide.
+- Marked preview controls as non-interactive and added a subtle editor-only preview label.
+
+### 1.3.0
+
+- Added a native, server-rendered Mlýn Slider block with a published-slider selector and editor preview.
 
 ### 1.2.0
 

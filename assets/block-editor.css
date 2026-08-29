@@ -1,0 +1,31 @@
+.editor-styles-wrapper .wp-block-mlyn-slider {
+	position: relative;
+	width: 100%;
+	max-width: none;
+}
+
+.editor-styles-wrapper .wp-block-mlyn-slider .mfs-slider {
+	box-sizing: border-box;
+}
+
+.editor-styles-wrapper .wp-block-mlyn-slider .mfs-arrow,
+.editor-styles-wrapper .wp-block-mlyn-slider .mfs-dots,
+.editor-styles-wrapper .wp-block-mlyn-slider .mfs-button {
+	pointer-events: none;
+}
+
+.editor-styles-wrapper .mfs-editor-preview-label {
+	position: absolute;
+	top: 12px;
+	right: 12px;
+	z-index: 5;
+	margin: 0;
+	padding: 5px 9px;
+	border-radius: 2px;
+	background: rgba(0, 0, 0, .7);
+	color: #fff;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 1.4;
+	pointer-events: none;
+}

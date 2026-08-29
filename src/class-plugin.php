@@ -33,6 +33,7 @@ final class Plugin {
 	private function __construct() {
 		add_action( 'init', array( $this, 'register_post_type' ) );
 		add_action( 'init', array( $this, 'register_shortcode' ) );
+		add_action( 'init', array( $this, 'register_block' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_assets' ) );
 		add_action( 'add_meta_boxes_' . self::POST_TYPE, array( $this, 'register_meta_boxes' ) );
 		add_action( 'save_post_' . self::POST_TYPE, array( $this, 'save_slider' ), 10, 2 );
@@ -74,6 +75,101 @@ final class Plugin {
 
 	public function register_shortcode(): void {
 		add_shortcode( 'mlyn_slider', array( $this, 'render_shortcode' ) );
+	}
+
+	/** Register the native dynamic slider block. */
+	public function register_block(): void {
+		$script_path = MFS_DIR . 'assets/block-editor.js';
+		$editor_style_path = MFS_DIR . 'assets/block-editor.css';
+
+		// Dynamic block previews render the real slider markup inside the editor
+		// iframe, so they need the same structural CSS as the public page.
+		wp_register_style(
+			'mfs-slider',
+			plugins_url( 'assets/frontend.css', MFS_FILE ),
+			array(),
+			MFS_VERSION
+		);
+		wp_register_style(
+			'mfs-slider-block-editor',
+			plugins_url( 'assets/block-editor.css', MFS_FILE ),
+			array( 'mfs-slider' ),
+			file_exists( $editor_style_path ) ? filemtime( $editor_style_path ) : MFS_VERSION
+		);
+
+		wp_register_script(
+			'mfs-slider-block-editor',
+			plugins_url( 'assets/block-editor.js', MFS_FILE ),
+			array( 'wp-blocks', 'wp-block-editor', 'wp-components', 'wp-element', 'wp-i18n', 'wp-server-side-render' ),
+			file_exists( $script_path ) ? filemtime( $script_path ) : MFS_VERSION,
+			true
+		);
+
+		$sliders = get_posts(
+			array(
+				'post_type'      => self::POST_TYPE,
+				'post_status'    => 'publish',
+				'posts_per_page' => -1,
+				'orderby'        => 'title',
+				'order'          => 'ASC',
+			)
+		);
+		wp_localize_script(
+			'mfs-slider-block-editor',
+			'mfsBlockEditor',
+			array(
+				'sliders' => array_map(
+					static function ( WP_Post $slider ): array {
+						return array(
+							'label' => $slider->post_title,
+							'value' => $slider->post_name,
+						);
+					},
+					$sliders
+				),
+			)
+		);
+
+		register_block_type(
+			'mlyn/slider',
+			array(
+				'api_version'     => 2,
+				'title'           => __( 'Mlýn slider', 'mlyn-flexible-slider' ),
+				'description'     => __( 'Displays a slider managed under Sliders.', 'mlyn-flexible-slider' ),
+				'category'        => 'media',
+				'icon'            => 'images-alt2',
+				'editor_script'   => 'mfs-slider-block-editor',
+				'editor_style'    => 'mfs-slider-block-editor',
+				'render_callback' => array( $this, 'render_block' ),
+				'attributes'      => array(
+					'slider' => array(
+						'type'    => 'string',
+						'default' => '',
+					),
+				),
+				'supports'        => array(
+					'align'           => false,
+					'customClassName' => false,
+					'html'            => false,
+					'reusable'        => false,
+				),
+			)
+		);
+	}
+
+	/** Render the native slider block. */
+	public function render_block( array $attributes ): string {
+		$slider = isset( $attributes['slider'] ) ? sanitize_title( $attributes['slider'] ) : '';
+		if ( '' === $slider ) {
+			return '';
+		}
+
+		$html = $this->render_shortcode( array( 'id' => $slider ) );
+		if ( '' === $html ) {
+			return '';
+		}
+
+		return '<div ' . get_block_wrapper_attributes() . '>' . $html . '</div>';
 	}
 
 	public function enqueue_frontend_assets(): void {

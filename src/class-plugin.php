@@ -11,11 +11,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class Plugin {
-	private const POST_TYPE     = 'mlyn_slider';
-	private const META_SETTINGS = '_mfs_settings';
-	private const META_SLIDES   = '_mfs_slides';
+	public const POST_TYPE     = 'mlyn_slider';
+	public const META_SETTINGS = '_mfs_settings';
+	public const META_SLIDES   = '_mfs_slides';
 
 	private static $instance;
+	private $transfer;
 
 	public static function instance(): self {
 		if ( ! self::$instance ) {
@@ -31,6 +32,7 @@ final class Plugin {
 	}
 
 	private function __construct() {
+		$this->transfer = new Transfer( $this );
 		add_action( 'init', array( $this, 'register_post_type' ) );
 		add_action( 'init', array( $this, 'register_shortcode' ) );
 		add_action( 'init', array( $this, 'register_block' ) );
@@ -42,6 +44,10 @@ final class Plugin {
 		add_filter( 'manage_' . self::POST_TYPE . '_posts_columns', array( $this, 'add_admin_columns' ) );
 		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( $this, 'render_admin_column' ), 10, 2 );
 		add_filter( 'enter_title_here', array( $this, 'filter_title_placeholder' ), 10, 2 );
+	}
+
+	public function transfer(): Transfer {
+		return $this->transfer;
 	}
 
 	public function register_post_type(): void {
@@ -773,7 +779,7 @@ final class Plugin {
 		return get_page_by_path( sanitize_title( (string) $id ), OBJECT, self::POST_TYPE );
 	}
 
-	private function get_settings( int $post_id ): array {
+	public function get_settings( int $post_id ): array {
 		$stored = get_post_meta( $post_id, self::META_SETTINGS, true );
 		return $this->sanitize_settings( wp_parse_args( is_array( $stored ) ? $stored : array(), $this->settings_defaults() ) );
 	}
@@ -814,7 +820,7 @@ final class Plugin {
 		);
 	}
 
-	private function get_slides( int $post_id ): array {
+	public function get_slides( int $post_id ): array {
 		$slides = get_post_meta( $post_id, self::META_SLIDES, true );
 		return is_array( $slides ) ? $slides : array();
 	}
@@ -840,6 +846,14 @@ final class Plugin {
 			'starts_at'        => sanitize_text_field( $slide['starts_at'] ?? '' ),
 			'ends_at'          => sanitize_text_field( $slide['ends_at'] ?? '' ),
 		);
+	}
+
+	public function normalize_transfer_settings( array $settings ): array {
+		return $this->sanitize_settings( wp_parse_args( $settings, $this->settings_defaults() ) );
+	}
+
+	public function normalize_transfer_slide( array $slide ): array {
+		return $this->sanitize_slide( wp_parse_args( $slide, $this->slide_defaults() ) );
 	}
 
 	private function slide_defaults(): array {

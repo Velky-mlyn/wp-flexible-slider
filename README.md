@@ -26,7 +26,19 @@ Slides can use a custom image, a Media Library video, or linked WordPress conten
 
 The linked-content picker searches all published public content that the current administrator may edit, including past calendar events. Search by title/text or exact numeric ID, optionally filter by content type, and use the displayed ID link to verify the item on its WordPress edit screen. Existing links are preserved and identified even if their content later becomes unpublished or is deleted.
 
+## Import and export
+
+Open **Sliders → Import / Export** to move sliders between WordPress sites. The versioned transfer ZIP contains the selected sliders, their settings and ordered slides, plus copies of directly selected images, videos, and posters. Media files are deduplicated by content hash when the same archive is imported again.
+
+Linked posts, pages, and events are not duplicated. They are matched on the destination by post type and slug/path instead of database ID, and unresolved links are reported after import for manual replacement. Internal button URLs pointing to the source site's home URL are rewritten to the destination site's home URL. An import can replace a slider with the same slug or create a separate copy.
+
 ## Changelog
+
+### 1.4.0
+
+- Added native, versioned slider transfer ZIP export and import under Sliders.
+- Included directly selected media and remapped it without relying on WordPress IDs.
+- Matched linked content by post type and slug/path, reported unresolved links, and rewrote source-site internal button URLs.
 
 ### 1.3.1
 

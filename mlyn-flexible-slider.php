@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Mlýn Flexible Slider
  * Description:       Reusable ordered image, video, and linked-content sliders for shortcodes and templates.
- * Version:           1.4.0
+ * Version:           1.4.3
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Velký mlýn
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'MFS_VERSION', '1.4.0' );
+define( 'MFS_VERSION', '1.4.3' );
 define( 'MFS_FILE', __FILE__ );
 define( 'MFS_DIR', plugin_dir_path( __FILE__ ) );
 

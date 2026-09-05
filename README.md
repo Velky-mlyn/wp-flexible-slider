@@ -34,6 +34,19 @@ Linked posts, pages, and events are not duplicated. They are matched on the dest
 
 ## Changelog
 
+### 1.4.3
+
+- Added pixel-based video cover sizing and centering for embedded TV browsers that ignore CSS video fitting and transforms.
+- Recalculate video geometry when its metadata loads and when the viewport changes.
+
+### 1.4.2
+
+- Centered cover videos with a legacy-compatible minimum-size and transform technique for TV browsers with unreliable video `object-fit` support.
+
+### 1.4.1
+
+- Added explicit positioning fallbacks so slides, videos, and overlays fill their containers in older browsers that do not support the CSS `inset` shorthand.
+
 ### 1.4.0
 
 - Added native, versioned slider transfer ZIP export and import under Sliders.

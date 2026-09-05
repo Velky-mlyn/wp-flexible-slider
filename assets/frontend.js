@@ -5,6 +5,7 @@
 
 	document.querySelectorAll('.mfs-slider').forEach(function (slider) {
 		const slides = Array.from(slider.querySelectorAll('.mfs-slide'));
+		const videos = Array.from(slider.querySelectorAll('.mfs-video'));
 		const dots = Array.from(slider.querySelectorAll('.mfs-dots button'));
 		const previous = slider.querySelector('.mfs-previous');
 		const next = slider.querySelector('.mfs-next');
@@ -18,12 +19,49 @@
 
 		if (!slides.length) return;
 
+		function sizeVideoToCover(video) {
+			const slide = video.parentElement;
+			const slideWidth = slide ? slide.clientWidth : 0;
+			const slideHeight = slide ? slide.clientHeight : 0;
+			const videoWidth = video.videoWidth;
+			const videoHeight = video.videoHeight;
+
+			if (!slideWidth || !slideHeight || !videoWidth || !videoHeight) return;
+
+			const scale = Math.max(slideWidth / videoWidth, slideHeight / videoHeight);
+			const renderedWidth = Math.ceil(videoWidth * scale);
+			const renderedHeight = Math.ceil(videoHeight * scale);
+
+			video.style.width = renderedWidth + 'px';
+			video.style.height = renderedHeight + 'px';
+			video.style.top = Math.floor((slideHeight - renderedHeight) / 2) + 'px';
+			video.style.left = Math.floor((slideWidth - renderedWidth) / 2) + 'px';
+			video.style.right = 'auto';
+			video.style.bottom = 'auto';
+			video.style.minWidth = '0';
+			video.style.minHeight = '0';
+			video.style.transform = 'none';
+		}
+
+		function sizeVideos() {
+			videos.forEach(sizeVideoToCover);
+		}
+
+		videos.forEach(function (video) {
+			if (video.readyState >= 1) sizeVideoToCover(video);
+			video.addEventListener('loadedmetadata', function () { sizeVideoToCover(video); });
+		});
+		window.addEventListener('resize', sizeVideos);
+
 		function playActiveVideo() {
 			slides.forEach(function (slide, index) {
 				const video = slide.querySelector('video');
 				if (!video) return;
 				if (index === current && videoAutoplay && !reducedMotion.matches) {
-					video.play().catch(function () {});
+					const playResult = video.play();
+					if (playResult && typeof playResult.catch === 'function') {
+						playResult.catch(function () {});
+					}
 				} else {
 					video.pause();
 				}
@@ -79,8 +117,13 @@
 			slider.addEventListener('focusout', start);
 		}
 		document.addEventListener('visibilitychange', start);
-		reducedMotion.addEventListener('change', function () { playActiveVideo(); start(); });
+		if (typeof reducedMotion.addEventListener === 'function') {
+			reducedMotion.addEventListener('change', function () { playActiveVideo(); start(); });
+		} else if (typeof reducedMotion.addListener === 'function') {
+			reducedMotion.addListener(function () { playActiveVideo(); start(); });
+		}
 		show(0);
+		sizeVideos();
 		start();
 	});
 }());

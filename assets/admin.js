@@ -71,7 +71,10 @@
 		selection.hidden = false;
 		picker.querySelector('.mfs-choose-content').textContent = mfsAdmin.changeContent;
 		picker.querySelector('.mfs-clear-content').disabled = false;
-		updateSummary(picker.closest('.mfs-slide-editor'));
+		const slide = picker.closest('.mfs-slide-editor');
+		slide.dataset.linkedImageUrl = item.image_url || '';
+		slide.dispatchEvent(new CustomEvent('mfs-image-change'));
+		updateSummary(slide);
 	}
 
 	function clearContentSelection(picker) {
@@ -79,7 +82,10 @@
 		picker.querySelector('.mfs-content-selection').hidden = true;
 		picker.querySelector('.mfs-choose-content').textContent = mfsAdmin.chooseContent;
 		picker.querySelector('.mfs-clear-content').disabled = true;
-		updateSummary(picker.closest('.mfs-slide-editor'));
+		const slide = picker.closest('.mfs-slide-editor');
+		slide.dataset.linkedImageUrl = '';
+		slide.dispatchEvent(new CustomEvent('mfs-image-change'));
+		updateSummary(slide);
 	}
 
 	function closeContentPicker() {
@@ -205,6 +211,11 @@
 				image.alt = '';
 				preview.appendChild(image);
 			}
+			if (kind === 'image') {
+				const slide = field.closest('.mfs-slide-editor');
+				slide.dataset.imageUrl = media.url;
+				slide.dispatchEvent(new CustomEvent('mfs-image-change'));
+			}
 			field.querySelector('.mfs-clear-media').disabled = false;
 		});
 
@@ -257,6 +268,11 @@
 			field.querySelector('.mfs-media-id').value = '';
 			field.querySelector('.mfs-media-preview').replaceChildren();
 			clear.disabled = true;
+			if (field.querySelector('[data-media-kind="image"]')) {
+				const slide = field.closest('.mfs-slide-editor');
+				slide.dataset.imageUrl = '';
+				slide.dispatchEvent(new CustomEvent('mfs-image-change'));
+			}
 		}
 	});
 
@@ -274,6 +290,7 @@
 	container.addEventListener('dragstart', function (event) {
 		const slide = event.target.closest('.mfs-slide-editor');
 		if (!slide) return;
+		if (event.target.closest('.mfs-focal-control')) { event.preventDefault(); return; }
 		dragged = slide;
 		slide.classList.add('is-dragging');
 		event.dataTransfer.effectAllowed = 'move';

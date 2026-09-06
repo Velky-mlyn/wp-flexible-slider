@@ -253,10 +253,17 @@ final class Plugin {
 			MFS_VERSION,
 			true
 		);
+		wp_enqueue_style( 'wp-components' );
+		wp_enqueue_script( 'mfs-focal-point', plugins_url( 'assets/focal-point.js', MFS_FILE ), array( 'mfs-admin', 'wp-element', 'wp-components' ), MFS_VERSION, true );
 		wp_localize_script(
 			'mfs-admin',
 			'mfsAdmin',
 			array(
+				'focalHelp' => __( 'Move the point to the part of the image that should stay visible. The crop adapts to the slider size.', 'mlyn-flexible-slider' ),
+				'focalEmpty' => __( 'Choose an image or linked content with a featured image first.', 'mlyn-flexible-slider' ),
+				'focalDesktop' => __( 'Wide slider preview', 'mlyn-flexible-slider' ),
+				'focalMobile' => __( 'Narrow slider preview', 'mlyn-flexible-slider' ),
+				'focalReset' => __( 'Center image', 'mlyn-flexible-slider' ),
 				'confirmRemove' => __( 'Remove this slide?', 'mlyn-flexible-slider' ),
 				'imageTitle'    => __( 'Choose image', 'mlyn-flexible-slider' ),
 				'videoTitle'    => __( 'Choose video', 'mlyn-flexible-slider' ),
@@ -334,7 +341,7 @@ final class Plugin {
 	private function render_slide_editor( string $index, array $slide ): void {
 		$slide = wp_parse_args( $slide, $this->slide_defaults() );
 		?>
-		<article class="mfs-slide-editor" draggable="true" data-slide-index="<?php echo esc_attr( $index ); ?>">
+		<article class="mfs-slide-editor" data-image-url="<?php echo esc_url( wp_get_attachment_image_url( (int) $slide['image_id'], 'full' ) ?: '' ); ?>" data-linked-image-url="<?php echo esc_url( get_the_post_thumbnail_url( (int) $slide['post_id'], 'full' ) ?: '' ); ?>" draggable="true" data-slide-index="<?php echo esc_attr( $index ); ?>">
 			<header class="mfs-slide-header">
 				<button type="button" class="mfs-drag-handle" aria-label="<?php esc_attr_e( 'Drag to reorder', 'mlyn-flexible-slider' ); ?>"><span class="dashicons dashicons-move"></span></button>
 				<strong class="mfs-slide-summary"><?php echo esc_html( $slide['title'] ?: __( 'Untitled slide', 'mlyn-flexible-slider' ) ); ?></strong>
@@ -363,6 +370,12 @@ final class Plugin {
 				<label><span><?php esc_html_e( 'Show from', 'mlyn-flexible-slider' ); ?></span><input type="datetime-local" name="mfs_slides[<?php echo esc_attr( $index ); ?>][starts_at]" value="<?php echo esc_attr( $slide['starts_at'] ); ?>"></label>
 				<label><span><?php esc_html_e( 'Show until', 'mlyn-flexible-slider' ); ?></span><input type="datetime-local" name="mfs_slides[<?php echo esc_attr( $index ); ?>][ends_at]" value="<?php echo esc_attr( $slide['ends_at'] ); ?>"></label>
 			</div>
+			<details class="mfs-focal-control" data-types="image,post">
+				<summary><?php esc_html_e( 'Image focal point / crop', 'mlyn-flexible-slider' ); ?></summary>
+				<input type="hidden" class="mfs-focal-x" name="mfs_slides[<?php echo esc_attr( $index ); ?>][focal_x]" value="<?php echo esc_attr( (string) $this->normalize_focal_coordinate( $slide['focal_x'], 50 ) ); ?>">
+				<input type="hidden" class="mfs-focal-y" name="mfs_slides[<?php echo esc_attr( $index ); ?>][focal_y]" value="<?php echo esc_attr( (string) $this->normalize_focal_coordinate( $slide['focal_y'], 35 ) ); ?>">
+				<div class="mfs-focal-root"></div>
+			</details>
 			<div class="mfs-slide-options">
 				<label><input type="checkbox" name="mfs_slides[<?php echo esc_attr( $index ); ?>][new_tab]" value="1" <?php checked( $slide['new_tab'] ); ?>> <?php esc_html_e( 'Open button in a new tab', 'mlyn-flexible-slider' ); ?></label>
 				<label class="mfs-post-field" data-types="post"><input type="checkbox" name="mfs_slides[<?php echo esc_attr( $index ); ?>][hide_after_event]" value="1" <?php checked( $slide['hide_after_event'] ); ?>> <?php esc_html_e( 'Hide automatically after a linked event ends', 'mlyn-flexible-slider' ); ?></label>
@@ -530,6 +543,8 @@ final class Plugin {
 			<dt><?php esc_html_e( 'Video', 'mlyn-flexible-slider' ); ?></dt>
 			<dd><?php esc_html_e( 'The Media Library video used by a custom-video slide. Active videos can autoplay when “Play active videos automatically” is enabled in Slider settings.', 'mlyn-flexible-slider' ); ?></dd>
 
+			<dt><?php esc_html_e( 'Image focal point / crop', 'mlyn-flexible-slider' ); ?></dt>
+			<dd><?php esc_html_e( 'Expand the crop control below the slide fields, then move the point to the area that should stay visible. Wide and narrow previews illustrate different slider shapes. The setting belongs to this slide only.', 'mlyn-flexible-slider' ); ?></dd>
 			<dt><?php esc_html_e( 'Video poster', 'mlyn-flexible-slider' ); ?></dt>
 			<dd><?php esc_html_e( 'Optional still image shown before the video starts or when automatic playback is unavailable.', 'mlyn-flexible-slider' ); ?></dd>
 
@@ -670,6 +685,9 @@ final class Plugin {
 
 	private function render_frontend_slide( array $slide, int $index, int $total ): void {
 		$style = $slide['image_url'] ? "background-image:url('" . esc_url( $slide['image_url'] ) . "');" : '';
+		if ( $slide['image_url'] && ! $slide['video_url'] ) {
+			$style .= sprintf( 'background-position:%d%% %d%%;', $this->normalize_focal_coordinate( $slide['focal_x'] ?? 50, 50 ), $this->normalize_focal_coordinate( $slide['focal_y'] ?? 35, 35 ) );
+		}
 		?>
 		<article class="mfs-slide<?php echo 0 === $index ? ' is-active' : ''; ?>" data-slide-id="<?php echo esc_attr( $slide['id'] ); ?>" style="<?php echo esc_attr( $style ); ?>" role="group" aria-roledescription="slide" aria-label="<?php echo esc_attr( sprintf( __( '%1$d of %2$d', 'mlyn-flexible-slider' ), $index + 1, $total ) ); ?>" aria-hidden="<?php echo 0 === $index ? 'false' : 'true'; ?>"<?php echo 0 === $index ? '' : ' inert'; ?>>
 			<?php if ( $slide['video_url'] ) : ?>
@@ -704,6 +722,8 @@ final class Plugin {
 			'button_label' => $slide['button_label'],
 			'url'          => $slide['url'],
 			'new_tab'      => $slide['new_tab'],
+			'focal_x'      => $this->normalize_focal_coordinate( $slide['focal_x'], 50 ),
+			'focal_y'      => $this->normalize_focal_coordinate( $slide['focal_y'], 35 ),
 			'image_url'    => $slide['image_id'] ? wp_get_attachment_image_url( $slide['image_id'], 'full' ) : '',
 			'video_url'    => $slide['video_id'] ? wp_get_attachment_url( $slide['video_id'] ) : '',
 			'poster_url'   => $slide['poster_id'] ? wp_get_attachment_image_url( $slide['poster_id'], 'full' ) : '',
@@ -825,6 +845,10 @@ final class Plugin {
 		return is_array( $slides ) ? $slides : array();
 	}
 
+	private function normalize_focal_coordinate( $value, int $default ): int {
+		return is_numeric( $value ) && is_finite( (float) $value ) ? (int) round( max( 0, min( 100, (float) $value ) ) ) : $default;
+	}
+
 	private function sanitize_slide( array $slide ): array {
 		$type = isset( $slide['type'] ) && in_array( $slide['type'], array( 'image', 'video', 'post' ), true ) ? $slide['type'] : 'image';
 		$id   = sanitize_key( $slide['id'] ?? '' );
@@ -833,6 +857,8 @@ final class Plugin {
 			'enabled'          => ! empty( $slide['enabled'] ),
 			'type'             => $type,
 			'post_id'          => absint( $slide['post_id'] ?? 0 ),
+			'focal_x'          => $this->normalize_focal_coordinate( $slide['focal_x'] ?? null, 50 ),
+			'focal_y'          => $this->normalize_focal_coordinate( $slide['focal_y'] ?? null, 35 ),
 			'image_id'         => absint( $slide['image_id'] ?? 0 ),
 			'video_id'         => absint( $slide['video_id'] ?? 0 ),
 			'poster_id'        => absint( $slide['poster_id'] ?? 0 ),
@@ -862,6 +888,8 @@ final class Plugin {
 			'enabled'          => true,
 			'type'             => 'image',
 			'post_id'          => 0,
+			'focal_x'          => 50,
+			'focal_y'          => 35,
 			'image_id'         => 0,
 			'video_id'         => 0,
 			'poster_id'        => 0,
@@ -915,6 +943,7 @@ final class Plugin {
 		}
 
 		return array(
+			'image_url'    => get_the_post_thumbnail_url( $post, 'full' ) ?: '',
 			'id'           => $post->ID,
 			'title'        => $title ?: __( '(no title)', 'mlyn-flexible-slider' ),
 			'post_type'    => $post->post_type,

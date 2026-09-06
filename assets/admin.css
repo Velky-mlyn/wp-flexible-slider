@@ -311,3 +311,36 @@ body.mfs-content-modal-open {
 		flex-direction: column;
 	}
 }
+
+.mfs-focal-control {
+	margin: 0 16px 16px;
+	padding: 12px;
+	border: 1px solid #c3c4c7;
+}
+
+.mfs-focal-control summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.mfs-focal-root {
+	max-width: 640px;
+}
+
+.mfs-focal-previews {
+	display: grid;
+	grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+	gap: 16px;
+	margin-bottom: 16px;
+}
+
+.mfs-focal-preview {
+	aspect-ratio: 16 / 5;
+	background-size: cover;
+	background-repeat: no-repeat;
+	background-color: #dcdcde;
+}
+
+.mfs-focal-preview-mobile {
+	aspect-ratio: 1 / 1;
+}

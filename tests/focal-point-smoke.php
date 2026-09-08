@@ -20,7 +20,7 @@ try {
  set_post_thumbnail( $linked, $images[0] );
  $slides = array(
   $plugin->normalize_transfer_slide( array( 'type' => 'image', 'image_id' => $images[0], 'focal_x' => 22, 'focal_y' => 78 ) ),
-  $plugin->normalize_transfer_slide( array( 'type' => 'post', 'post_id' => $linked, 'focal_x' => 81, 'focal_y' => 19 ) ),
+  $plugin->normalize_transfer_slide( array( 'type' => 'post', 'post_id' => $linked, 'focal_x' => 81, 'focal_y' => 19, 'show_eyebrow' => false, 'show_button' => false ) ),
  );
  update_post_meta( $id, MFS\Plugin::META_SLIDES, $slides );
  $html = mlyn_render_slider( $id );
@@ -38,6 +38,7 @@ try {
  $imported = $copies[0]->ID;
  $copy = $plugin->get_slides( $imported )[0];
  $assert( 81 === $copy['focal_x'] && 19 === $copy['focal_y'], 'Transfer lost crop coordinates.' );
+ $assert( false === $copy['show_eyebrow'] && false === $copy['show_button'], 'Transfer lost visibility settings.' );
  echo "Focal-point normalization, persistence, rendering and transfer passed.\n";
 } finally {
  if ( $imported ) { wp_delete_post( $imported, true ); }

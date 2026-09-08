@@ -377,6 +377,10 @@ final class Plugin {
 				<div class="mfs-focal-root"></div>
 			</details>
 			<div class="mfs-slide-options">
+				<input type="hidden" name="mfs_slides[<?php echo esc_attr( $index ); ?>][show_eyebrow]" value="0">
+				<label><input type="checkbox" name="mfs_slides[<?php echo esc_attr( $index ); ?>][show_eyebrow]" value="1" <?php checked( $slide['show_eyebrow'] ); ?>> <?php esc_html_e( 'Show eyebrow', 'mlyn-flexible-slider' ); ?></label>
+				<input type="hidden" name="mfs_slides[<?php echo esc_attr( $index ); ?>][show_button]" value="0">
+				<label><input type="checkbox" name="mfs_slides[<?php echo esc_attr( $index ); ?>][show_button]" value="1" <?php checked( $slide['show_button'] ); ?>> <?php esc_html_e( 'Show button', 'mlyn-flexible-slider' ); ?></label>
 				<label><input type="checkbox" name="mfs_slides[<?php echo esc_attr( $index ); ?>][new_tab]" value="1" <?php checked( $slide['new_tab'] ); ?>> <?php esc_html_e( 'Open button in a new tab', 'mlyn-flexible-slider' ); ?></label>
 				<label class="mfs-post-field" data-types="post"><input type="checkbox" name="mfs_slides[<?php echo esc_attr( $index ); ?>][hide_after_event]" value="1" <?php checked( $slide['hide_after_event'] ); ?>> <?php esc_html_e( 'Hide automatically after a linked event ends', 'mlyn-flexible-slider' ); ?></label>
 			</div>
@@ -549,7 +553,7 @@ final class Plugin {
 			<dd><?php esc_html_e( 'Optional still image shown before the video starts or when automatic playback is unavailable.', 'mlyn-flexible-slider' ); ?></dd>
 
 			<dt><?php esc_html_e( 'Eyebrow / label', 'mlyn-flexible-slider' ); ?></dt>
-			<dd><?php esc_html_e( 'Small text above the title. A linked calendar event inherits its first tag. Enter text to override that tag.', 'mlyn-flexible-slider' ); ?></dd>
+			<dd><?php esc_html_e( 'Small text above the title. A linked calendar event inherits its first tag. Enter text to override that tag. Uncheck Show eyebrow to hide this element without deleting its text.', 'mlyn-flexible-slider' ); ?></dd>
 
 			<dt><?php esc_html_e( 'Title', 'mlyn-flexible-slider' ); ?></dt>
 			<dd><?php esc_html_e( 'Main slide heading. Linked content inherits its WordPress title; entered text overrides it.', 'mlyn-flexible-slider' ); ?></dd>
@@ -558,7 +562,7 @@ final class Plugin {
 			<dd><?php esc_html_e( 'Secondary text below the title. A linked calendar event inherits its start date and time; entered text overrides it.', 'mlyn-flexible-slider' ); ?></dd>
 
 			<dt><?php esc_html_e( 'Button label', 'mlyn-flexible-slider' ); ?></dt>
-			<dd><?php esc_html_e( 'Visible button text. A linked calendar event defaults to “Vstupenky”. The button is shown only when both its label and URL are available.', 'mlyn-flexible-slider' ); ?></dd>
+			<dd><?php esc_html_e( 'Visible button text. A linked calendar event defaults to “Vstupenky”. The button is shown only when Show button is checked and both its label and URL are available. Uncheck Show button to hide it, including for free events.', 'mlyn-flexible-slider' ); ?></dd>
 
 			<dt><?php esc_html_e( 'Button URL', 'mlyn-flexible-slider' ); ?></dt>
 			<dd><?php esc_html_e( 'Button destination. Linked content inherits its permalink; an entered URL overrides it.', 'mlyn-flexible-slider' ); ?></dd>
@@ -697,10 +701,10 @@ final class Plugin {
 			<?php endif; ?>
 			<div class="mfs-overlay" aria-hidden="true"></div>
 			<div class="mfs-content">
-				<?php if ( $slide['eyebrow'] ) : ?><span class="mfs-eyebrow label inter-300"><?php echo esc_html( $slide['eyebrow'] ); ?></span><?php endif; ?>
+				<?php if ( ( $slide['show_eyebrow'] ?? true ) && $slide['eyebrow'] ) : ?><span class="mfs-eyebrow label inter-300"><?php echo esc_html( $slide['eyebrow'] ); ?></span><?php endif; ?>
 				<?php if ( $slide['title'] ) : ?><p class="mfs-title name"><?php echo esc_html( $slide['title'] ); ?></p><?php endif; ?>
 				<?php if ( $slide['subtitle'] ) : ?><p class="mfs-subtitle date mb-4 mt-2"><?php echo esc_html( $slide['subtitle'] ); ?></p><?php endif; ?>
-				<?php if ( $slide['button_label'] && $slide['url'] ) : ?>
+				<?php if ( ( $slide['show_button'] ?? true ) && $slide['button_label'] && $slide['url'] ) : ?>
 					<a class="mfs-button btn btn-primary" href="<?php echo esc_url( $slide['url'] ); ?>"<?php echo $slide['new_tab'] ? ' target="_blank" rel="noopener noreferrer"' : ''; ?>><?php echo esc_html( $slide['button_label'] ); ?></a>
 				<?php endif; ?>
 			</div>
@@ -716,6 +720,8 @@ final class Plugin {
 
 		$resolved = array(
 			'id'           => $slide['id'],
+			'show_eyebrow' => $slide['show_eyebrow'],
+			'show_button'  => $slide['show_button'],
 			'eyebrow'     => $slide['eyebrow'],
 			'title'        => $slide['title'],
 			'subtitle'     => $slide['subtitle'],
@@ -862,6 +868,8 @@ final class Plugin {
 			'image_id'         => absint( $slide['image_id'] ?? 0 ),
 			'video_id'         => absint( $slide['video_id'] ?? 0 ),
 			'poster_id'        => absint( $slide['poster_id'] ?? 0 ),
+			'show_eyebrow'     => ! array_key_exists( 'show_eyebrow', $slide ) || ! empty( $slide['show_eyebrow'] ),
+			'show_button'      => ! array_key_exists( 'show_button', $slide ) || ! empty( $slide['show_button'] ),
 			'eyebrow'          => sanitize_text_field( $slide['eyebrow'] ?? '' ),
 			'title'            => sanitize_text_field( $slide['title'] ?? '' ),
 			'subtitle'         => sanitize_text_field( $slide['subtitle'] ?? '' ),
@@ -893,6 +901,8 @@ final class Plugin {
 			'image_id'         => 0,
 			'video_id'         => 0,
 			'poster_id'        => 0,
+			'show_eyebrow'     => true,
+			'show_button'      => true,
 			'eyebrow'          => '',
 			'title'            => '',
 			'subtitle'         => '',

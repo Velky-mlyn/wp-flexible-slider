@@ -28,6 +28,8 @@ The linked-content picker searches all published public content that the current
 
 For image slides (including linked featured images), expand **Image focal point / crop** and move the point to the area that should stay visible. Wide and narrow previews show how the crop changes with the slider shape. **Center image** resets the point to the center. The crop is saved per slide and does not change the original image or an event's detail banner. Selecting a different image resets the slide crop; existing slides retain their previous 50% / 35% positioning until edited.
 
+Per-slide **Show eyebrow** and **Show button** controls hide either element independently, including values inherited from linked events. Both are enabled by default for existing and new slides. Hiding an element preserves its text and URL for later use.
+
 ## Import and export
 
 Open **Sliders → Import / Export** to move sliders between WordPress sites. The versioned transfer ZIP contains the selected sliders, their settings and ordered slides, plus copies of directly selected images, videos, and posters. Media files are deduplicated by content hash when the same archive is imported again.
@@ -35,6 +37,10 @@ Open **Sliders → Import / Export** to move sliders between WordPress sites. Th
 Linked posts, pages, and events are not duplicated. They are matched on the destination by post type and slug/path instead of database ID, and unresolved links are reported after import for manual replacement. Internal button URLs pointing to the source site's home URL are rewritten to the destination site's home URL. An import can replace a slider with the same slug or create a separate copy.
 
 ## Changelog
+
+### 1.6.0
+
+- Added independent eyebrow and button visibility controls, preserved through export/import.
 
 ### 1.5.0
 
